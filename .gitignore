@@ -2,3 +2,15 @@ node_modules/
 dist/
 *.log
 .DS_Store
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+# Env
+.env
+.env.*
+!.env.example
+# OS
+Thumbs.db
+*.tmp

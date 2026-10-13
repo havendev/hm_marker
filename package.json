@@ -1,8 +1,27 @@
 {
-  "name": "ai-marker",
+  "name": "aimarker",
   "version": "0.1.0",
-  "description": "视频收藏智能整理 Chrome 插件",
+  "description": "AiMarker - 视频收藏智能整理 Chrome 插件，支持抖音/B站收藏自动采集、AI 分类与字幕提取",
   "type": "module",
+  "license": "MIT",
+  "author": "havendev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/havendev/hm_marker.git"
+  },
+  "homepage": "https://github.com/havendev/hm_marker",
+  "bugs": {
+    "url": "https://github.com/havendev/hm_marker/issues"
+  },
+  "keywords": [
+    "chrome-extension",
+    "douyin",
+    "bilibili",
+    "video-favorites",
+    "ai-classification",
+    "deepseek",
+    "subtitle"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "vite build",
