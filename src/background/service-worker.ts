@@ -166,13 +166,13 @@ async function enrichBilibiliVideos(videos: VideoItem[]): Promise<VideoItem[]> {
                 end: Math.round(Number(item.to || 0)),
                 text: String(item.content || "").trim(),
               })).filter((seg: SubtitleSegment) => seg.text.length > 0);
-             subtitle = subtitleSegments.map((s) => s.text).join(" ");
-           }
-         }
-       } catch { /* subtitle optional */ }
-     }
+              subtitle = subtitleSegments.map((s) => s.text).join(" ");
+            }
+          }
+        } catch { /* subtitle optional */ }
+      }
 
-     // 3.5) 字幕质量过滤：剔除纯音乐标记等垃圾内容
+      // 3.5) 字幕质量过滤：剔除纯音乐标记等垃圾内容
       if (subtitle) {
         const cleaned = cleanSubtitle(subtitle, subtitleSegments);
         if (!cleaned) {
@@ -184,18 +184,11 @@ async function enrichBilibiliVideos(videos: VideoItem[]): Promise<VideoItem[]> {
         }
       }
 
-     // 3.55) 字幕关联性检测：B站 AI 字幕可能匹配到错误的音频源
-     if (subtitle) {
-       const videoTitle = String(vd.title || "");
-       const videoDesc = String(vd.desc || "");
-       if (!isSubtitleRelevant(videoTitle, tags, videoDesc, subtitle)) {
-         console.warn(`[AiMarker] 字幕与视频内容不匹配，丢弃: ${videoTitle.slice(0, 30)}`);
-         subtitle = undefined;
-         subtitleSegments = undefined;
-       }
-     }
+      // 4) 章节解析（多P 或 简介时间轴）
+      let chapters: ChapterInfo[] | undefined;
+      const desc = String(vd.desc || "");
 
-    // 3.6) 多P视频：用分P列表生成章节
+      // 多P视频：用分P列表生成章节
       const pages = vd.pages;
       if (Array.isArray(pages) && pages.length > 1) {
         chapters = pages.map((p: Record<string, unknown>) => ({
@@ -205,10 +198,8 @@ async function enrichBilibiliVideos(videos: VideoItem[]): Promise<VideoItem[]> {
         }));
       }
 
-     // 4) 章节解析（从简介时间轴）
-      let chapters: ChapterInfo[] | undefined;
-      const desc = String(vd.desc || "");
-      if (desc) {
+      // 简介中有时间轴的，作为章节
+      if (desc && !chapters) {
         const lines = desc.split("\n");
         const timeRe = /(\d{1,2}:\d{2}(?::\d{2})?)\s*(.+)/;
         const found: ChapterInfo[] = [];
@@ -229,9 +220,9 @@ async function enrichBilibiliVideos(videos: VideoItem[]): Promise<VideoItem[]> {
       const stat = vd.stat || {};
       enriched.push({
         ...video,
-       title: String(vd.title || video.title),
+        title: String(vd.title || video.title),
         desc: desc || undefined,
-       author: vd.owner?.name || video.author,
+        author: vd.owner?.name || video.author,
         coverUrl: vd.pic || video.coverUrl,
         duration: vd.duration || video.duration,
         likeCount: stat.like,
