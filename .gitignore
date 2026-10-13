@@ -15,3 +15,5 @@ dist/
 Thumbs.db
 *.tmp
 aimarker-*.zip
+*.pem
+*.crx
