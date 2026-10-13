@@ -227,19 +227,94 @@ function downloadFile(content: string, filename: string, mime: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url; a.download = filename; a.click();
-  URL.revokeObjectURL(url);
+ URL.revokeObjectURL(url);
+}
+
+// ─── 统一导出格式 ──────────────────────────────────────────
+
+interface NormalizedVideo {
+  id: string;
+  source: string;
+  url: string;
+  title: string;
+  description: string;
+  author: string;
+  coverUrl: string;
+  duration: number;
+  publishTime: string;
+  stats: { likes: number; comments: number; favorites: number; shares: number };
+  tags: string[];
+  chapters: { time: string; title: string; content: string }[];
+  subtitle: { text: string; segments: { start: number; end: number; text: string }[] };
+  content: string;
+  aiSummary: string;
+  category: string;
+  summary: string;
+  keywords: string[];
+  processed: boolean;
+}
+
+function normalizeVideo(v: VideoItem): NormalizedVideo {
+  return {
+    id: v.id,
+    source: v.source || "unknown",
+    url: v.url,
+    title: v.title || "",
+    description: v.desc ?? "",
+    author: v.author ?? "",
+    coverUrl: v.coverUrl ?? "",
+    duration: v.duration ?? 0,
+    publishTime: v.publishTime ?? "",
+    stats: {
+      likes: v.likeCount ?? 0,
+      comments: v.commentCount ?? 0,
+      favorites: v.collectCount ?? 0,
+      shares: v.shareCount ?? 0,
+    },
+    tags: v.tags ?? [],
+    chapters: (v.chapters ?? []).map((c) => ({
+      time: c.time ?? "",
+      title: c.title ?? "",
+      content: c.content ?? "",
+    })),
+    subtitle: {
+      text: v.subtitle ?? "",
+      segments: (v.subtitleSegments ?? []).map((s) => ({
+        start: s.start ?? 0,
+        end: s.end ?? 0,
+        text: s.text ?? "",
+      })),
+    },
+    content: v.content ?? "",
+    aiSummary: v.aiSummary ?? "",
+    category: v.category ?? "",
+    summary: v.summary ?? "",
+    keywords: v.keywords ?? [],
+    processed: v.processed ?? false,
+  };
+}
+
+function buildExportBundle(): { exportTime: string; total: number; version: string; videos: NormalizedVideo[] } {
+  return {
+    exportTime: new Date().toISOString(),
+    version: "1.0",
+    total: allVideos.length,
+    videos: allVideos.map(normalizeVideo),
+  };
 }
 
 function exportJSON() {
-  downloadFile(JSON.stringify(allVideos, null, 2), `aimarker_${new Date().toISOString().slice(0, 10)}.json`, "application/json");
+  const bundle = buildExportBundle();
+  downloadFile(JSON.stringify(bundle, null, 2), `aimarker_${new Date().toISOString().slice(0, 10)}.json`, "application/json");
 }
 
 function exportCSV() {
-  const headers = ["id", "title", "url", "category", "summary", "author", "tags", "subtitle", "source"];
-  const rows = allVideos.map((v) =>
-    [v.id, v.title, v.url, v.category || "", v.summary || "", v.author || "", (v.keywords || v.tags || []).join("; "), (v.subtitle || "").slice(0, 500), v.source]
-      .map((s) => `"${String(s).replace(/"/g, '""')}"`).join(",")
-  );
+  const headers = ["id", "source", "url", "title", "description", "author", "category", "summary", "keywords", "tags", "content", "subtitle", "duration", "publishTime", "likes", "comments", "favorites", "shares", "processed"];
+  const rows = allVideos.map((v) => {
+    const n = normalizeVideo(v);
+    return [n.id, n.source, n.url, n.title, n.description.slice(0, 200), n.author, n.category, n.summary, n.keywords.join("; "), n.tags.join("; "), n.content.slice(0, 500), n.subtitle.text.slice(0, 500), n.duration, n.publishTime, n.stats.likes, n.stats.comments, n.stats.favorites, n.stats.shares, n.processed ? "yes" : "no"]
+      .map((s) => `"${String(s).replace(/"/g, '""')}"`).join(",");
+  });
   downloadFile("\ufeff" + headers.join(",") + "\n" + rows.join("\n"), `aimarker_${new Date().toISOString().slice(0, 10)}.csv`, "text/csv;charset=utf-8");
 }
 

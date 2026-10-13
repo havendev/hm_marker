@@ -10,6 +10,7 @@ export interface VideoItem {
   id: string;
   title: string;
   url: string;
+  desc?: string;
   coverUrl?: string;
   author?: string;
   duration?: number;

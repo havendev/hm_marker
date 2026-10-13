@@ -195,8 +195,9 @@ async function enrichBilibiliVideos(videos: VideoItem[]): Promise<VideoItem[]> {
       const stat = vd.stat || {};
       enriched.push({
         ...video,
-        title: String(vd.title || video.title),
-        author: vd.owner?.name || video.author,
+       title: String(vd.title || video.title),
+        desc: desc || undefined,
+       author: vd.owner?.name || video.author,
         coverUrl: vd.pic || video.coverUrl,
         duration: vd.duration || video.duration,
         likeCount: stat.like,
@@ -261,8 +262,9 @@ async function enrichAllVideos(videos: VideoItem[], platform = "douyin"): Promis
         const d = detail.detail;
         enrichedVideos.push({
           ...video,
-          title: platform === "bilibili" ? video.title : (d.desc || video.title),
-          author: d.author || video.author,
+         title: platform === "bilibili" ? video.title : (d.desc || video.title),
+          desc: d.desc || video.desc,
+         author: d.author || video.author,
           coverUrl: d.coverUrl || video.coverUrl,
           duration: d.duration,
           likeCount: d.likeCount,
