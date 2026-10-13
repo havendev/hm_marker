@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AiMarker</title>
+  <link rel="stylesheet" href="./popup.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>AiMarker</h1>
+      <p class="subtitle">视频收藏智能整理</p>
+    </header>
+    <div id="login-status" class="status-card">
+      <div class="status-row">
+        <span class="dot" id="login-dot"></span>
+        <span id="login-text">检测中...</span>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="btn-collect" class="btn btn-primary" disabled>采集收藏</button>
+      <button id="btn-process" class="btn btn-secondary" disabled>AI 分类</button>
+      <button id="btn-dashboard" class="btn btn-outline">查看整理结果</button>
+    </div>
+    <div id="progress" class="progress-area hidden">
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+      <p id="progress-text"></p>
+    </div>
+    <div class="stats" id="stats">
+      <div class="stat-item">
+        <span class="stat-num" id="stat-total">0</span>
+        <span class="stat-label">已采集</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-num" id="stat-processed">0</span>
+        <span class="stat-label">已分类</span>
+      </div>
+    </div>
+    <details class="settings">
+      <summary>设置</summary>
+      <div class="settings-body">
+        <label>
+          DeepSeek API Key
+          <input type="password" id="api-key-input" placeholder="sk-..." />
+        </label>
+        <label>
+          模型
+          <select id="model-select">
+            <option value="deepseek-chat">DeepSeek-V3 (推荐)</option>
+            <option value="deepseek-reasoner">DeepSeek-R1</option>
+          </select>
+        </label>
+        <label>
+          测试采集数量（0=全部）
+          <input type="number" id="collect-limit-input" placeholder="0" min="0" max="500" style="width:60px" />
+        </label>
+        <button id="btn-save-config" class="btn btn-small">保存设置</button>
+      </div>
+    </details>
+  </div>
+  <script type="module" src="./popup.ts"></script>
+</body>
+</html>

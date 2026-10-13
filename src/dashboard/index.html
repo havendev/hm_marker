@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AiMarker - 收藏整理</title>
+  <link rel="stylesheet" href="./dashboard.css" />
+</head>
+<body>
+  <div id="app">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h1>AiMarker</h1>
+        <span class="badge" id="total-badge">0</span>
+      </div>
+      <div class="search-box">
+        <input type="text" id="search" placeholder="搜索视频..." />
+      </div>
+      <nav class="category-nav" id="category-nav"></nav>
+      <div class="sidebar-footer">
+        <button id="btn-export" class="btn-text">导出 JSON</button>
+        <button id="btn-export-csv" class="btn-text">导出 CSV</button>
+        <button id="btn-refresh" class="btn-text">刷新数据</button>
+        <button id="btn-clear-all" class="clear-all-btn">清空全部</button>
+      </div>
+    </aside>
+    <main class="main-content">
+      <div class="toolbar">
+        <div class="sort-group">
+          <label>排序：</label>
+          <select id="sort-select">
+            <option value="category">按分类</option>
+            <option value="title">按标题</option>
+          </select>
+        </div>
+        <div class="view-toggle">
+          <button class="view-btn active" data-view="grid" id="view-grid">网格</button>
+          <button class="view-btn" data-view="list" id="view-list">列表</button>
+        </div>
+      </div>
+      <div id="video-list" class="video-grid"></div>
+      <div id="empty-state" class="empty-state">
+        <p>还没有采集到任何视频</p>
+        <p class="hint">请点击插件弹窗中的「采集收藏」按钮开始</p>
+      </div>
+    </main>
+  </div>
+  <script type="module" src="./dashboard.ts"></script>
+</body>
+</html>
