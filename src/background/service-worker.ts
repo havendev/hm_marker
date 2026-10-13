@@ -41,6 +41,67 @@ async function checkDouyinLogin(): Promise<boolean> {
   } catch { return false; }
 }
 
+async function checkBilibiliLogin(): Promise<boolean> {
+  try {
+    const cookie = await chrome.cookies.get({ url: "https://www.bilibili.com", name: "SESSDATA" });
+    return !!cookie;
+  } catch { return false; }
+}
+
+// ─── B站 阶段一：API 收藏列表采集 ────────────────────────────
+
+async function collectBilibiliFavorites(onProgress: (status: string) => void): Promise<VideoItem[]> {
+  onProgress("B站：获取用户信息...");
+  const navResp = await fetch("https://api.bilibili.com/x/web-interface/nav", { credentials: "include" });
+  const navData = await navResp.json();
+  if (navData.code !== 0 || !navData.data?.mid) throw new Error("B站未登录，请先登录 bilibili.com");
+  const mid = navData.data.mid;
+
+  onProgress("B站：获取收藏夹列表...");
+  const folderResp = await fetch(
+    `https://api.bilibili.com/x/v3/fav/folder/created/list-all?up_mid=${mid}`,
+    { credentials: "include" },
+  );
+  const folderData = await folderResp.json();
+  if (folderData.code !== 0) throw new Error("获取收藏夹失败: " + (folderData.message || ""));
+  const folders = folderData.data?.list || [];
+
+  const videos: VideoItem[] = [];
+  const seen = new Set<string>();
+  for (const folder of folders) {
+    let page = 1;
+    while (true) {
+      onProgress(`B站：采集「${folder.title}」第 ${page} 页...`);
+      const resp = await fetch(
+        `https://api.bilibili.com/x/v3/fav/resource/list?media_id=${folder.id}&pn=${page}&ps=20&platform=web&order=mtime`,
+        { credentials: "include" },
+      );
+      const data = await resp.json();
+      if (data.code !== 0 || !data.data?.medias) break;
+      for (const m of data.data.medias) {
+        if (!m.bvid || seen.has(m.bvid)) continue;
+        seen.add(m.bvid);
+        videos.push({
+          id: m.bvid,
+          title: String(m.title || "").replace(/<[^>]+>/g, ""),
+          url: `https://www.bilibili.com/video/${m.bvid}`,
+          coverUrl: m.cover,
+          author: m.upper?.name,
+          duration: m.duration,
+          publishTime: m.pubdate ? new Date(m.pubdate * 1000).toISOString().slice(0, 10) : undefined,
+          tags: [],
+          source: "bilibili",
+          processed: false,
+        });
+      }
+      if (data.data.medias.length < 20) break;
+      page++;
+      await sleep(300);
+    }
+  }
+  return videos;
+}
+
 // ─── 阶段一：收藏列表采集 ────────────────────────────────────
 
 async function collectFavoritesList(): Promise<VideoItem[]> {
@@ -60,7 +121,7 @@ async function collectFavoritesList(): Promise<VideoItem[]> {
 
 // ─── 阶段二：逐个提取视频详情（含字幕）────────────────────────
 
-async function enrichAllVideos(videos: VideoItem[]): Promise<VideoItem[]> {
+async function enrichAllVideos(videos: VideoItem[], platform = "douyin"): Promise<VideoItem[]> {
   if (videos.length === 0) return videos;
   sendProgress("DETAIL_PROGRESS", 0, videos.length, `阶段2：开始提取视频内容 (共 ${videos.length} 个)...`);
 
@@ -84,7 +145,7 @@ async function enrichAllVideos(videos: VideoItem[]): Promise<VideoItem[]> {
         const d = detail.detail;
         enrichedVideos.push({
           ...video,
-          title: d.desc || video.title,
+          title: platform === "bilibili" ? video.title : (d.desc || video.title),
           author: d.author || video.author,
           coverUrl: d.coverUrl || video.coverUrl,
           duration: d.duration,
@@ -147,7 +208,14 @@ async function handleProcessVideos(): Promise<void> {
 chrome.runtime.onMessage.addListener((msg: Message, _sender, sendResponse) => {
   switch (msg.type) {
     case "CHECK_LOGIN":
-      checkDouyinLogin().then((loggedIn) => sendResponse({ loggedIn }));
+      (async () => {
+        const config = await getConfig();
+        const platform = (msg.payload as { platform?: string })?.platform || config.platform || "douyin";
+        const loggedIn = platform === "bilibili"
+          ? await checkBilibiliLogin()
+          : await checkDouyinLogin();
+        sendResponse({ loggedIn });
+      })();
       return true;
     case "OPEN_DASHBOARD":
       chrome.tabs.create({ url: chrome.runtime.getURL("src/dashboard/index.html") }).then(() => sendResponse({ ok: true }));
@@ -156,13 +224,20 @@ chrome.runtime.onMessage.addListener((msg: Message, _sender, sendResponse) => {
       (async () => {
         try {
           const config = await getConfig();
-          let videos = await collectFavoritesList();
+          const platform = config.platform || "douyin";
+          let videos: VideoItem[];
+          if (platform === "bilibili") {
+            videos = await collectBilibiliFavorites((status) =>
+              sendProgress("COLLECT_PROGRESS", 0, 0, status));
+          } else {
+            videos = await collectFavoritesList();
+          }
           if (config.collectLimit > 0 && videos.length > config.collectLimit) {
             videos = videos.slice(0, config.collectLimit);
           }
           await mergeVideos(videos);
           sendProgress("COLLECT_PROGRESS", videos.length, videos.length, `阶段1完成：发现 ${videos.length} 个视频`);
-          const enriched = await enrichAllVideos(videos);
+          const enriched = await enrichAllVideos(videos, platform);
           await mergeVideos(enriched);
           sendProgress("COLLECT_COMPLETE", enriched.length, enriched.length, "采集完成");
           sendResponse({ count: enriched.length, videos: enriched });

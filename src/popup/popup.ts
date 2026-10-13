@@ -18,10 +18,11 @@ const btnSaveConfig = $("btn-save-config") as HTMLButtonElement;
 const collectLimitInput = $("collect-limit-input") as HTMLInputElement;
 
 let isBusy = false;
+let currentPlatform = "douyin";
 
 async function checkLogin(): Promise<{ loggedIn: boolean }> {
   return new Promise((resolve) => {
-    chrome.runtime.sendMessage({ type: "CHECK_LOGIN" } as Message, (resp) => {
+    chrome.runtime.sendMessage({ type: "CHECK_LOGIN", payload: { platform: currentPlatform } } as Message, (resp) => {
       resolve(resp || { loggedIn: false });
     });
   });
@@ -30,7 +31,9 @@ async function checkLogin(): Promise<{ loggedIn: boolean }> {
 async function refreshLoginStatus() {
   const { loggedIn } = await checkLogin();
   loginDot.className = `dot ${loggedIn ? "ok" : "err"}`;
-  loginText.textContent = loggedIn ? "抖音已登录" : "抖音未登录，请先登录";
+  const name = currentPlatform === "bilibili" ? "B站" : "抖音";
+  loginText.textContent = loggedIn ? `${name}已登录` : `${name}未登录，请先登录`;
+  btnCollect.textContent = `采集${name}收藏`;
   btnCollect.disabled = !loggedIn || isBusy;
 }
 
@@ -116,8 +119,23 @@ async function init() {
   apiKeyInput.value = config.apiKey;
   collectLimitInput.value = String(config.collectLimit ?? 0);
   modelSelect.value = config.model;
+  currentPlatform = config.platform || "douyin";
+  document.querySelectorAll(".platform-tab").forEach((t) => {
+    t.classList.toggle("active", (t as HTMLElement).dataset.platform === currentPlatform);
+  });
   await refreshLoginStatus();
   await refreshStats();
 }
 
 init();
+
+// Platform tab switching
+document.querySelectorAll(".platform-tab").forEach((tab) => {
+  tab.addEventListener("click", async () => {
+    document.querySelectorAll(".platform-tab").forEach((t) => t.classList.remove("active"));
+    tab.classList.add("active");
+    currentPlatform = (tab as HTMLElement).dataset.platform || "douyin";
+    await saveConfig({ platform: currentPlatform });
+    await refreshLoginStatus();
+  });
+});

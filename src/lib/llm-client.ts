@@ -19,6 +19,9 @@ function buildPrompt(videos: VideoItem[]): string {
       // 截取前 800 字，避免 prompt 过长
       parts.push(`字幕: ${v.subtitle.slice(0, 800)}`);
     }
+    if (!v.subtitle && v.content) {
+      parts.push(`内容: ${v.content.slice(0, 500)}`);
+    }
     if (v.author) parts.push(`作者: ${v.author}`);
     return parts.join("\n");
   });
