@@ -107,3 +107,47 @@ export function cleanSubtitle(
     segments: filtered,
   };
 }
+
+// ─── 字幕与视频内容的关联性检测 ──────────────────────────────
+
+function extractChineseChars(text: string): Set<string> {
+  const chars = new Set<string>();
+  for (const c of text) {
+    if (c >= "\u4e00" && c <= "\u9fff") chars.add(c);
+  }
+  return chars;
+}
+
+/**
+ * Check if subtitle is relevant to the video by comparing character overlap.
+ * B站 AI 字幕有时会匹配到错误的音频源，导致字幕内容完全不对。
+ *
+ * @param title Video title
+ * @param tags Video tags joined as string
+ * @param desc Video description
+ * @param subtitle The subtitle text to validate
+ * @returns true if subtitle seems relevant, false if likely mismatched
+ */
+export function isSubtitleRelevant(
+  title: string,
+  tags: string[],
+  desc: string,
+  subtitle: string,
+): boolean {
+  if (!subtitle || subtitle.trim().length < 20) return false;
+
+  // Build reference character set from title + tags + desc
+  const reference = extractChineseChars(title + " " + tags.join(" ") + " " + desc);
+  if (reference.size < 5) return true; // Can't reliably judge, allow it
+
+  // Sample first 500 chars of subtitle for efficiency
+  const subSample = subtitle.slice(0, 500);
+  const subChars = extractChineseChars(subSample);
+  if (subChars.size === 0) return true; // Non-Chinese subtitle, allow it
+
+  const overlap = [...subChars].filter((c) => reference.has(c));
+  const ratio = overlap.length / subChars.size;
+
+  // Threshold: <30% character overlap means subtitle is likely from wrong source
+  return ratio >= 0.3;
+}

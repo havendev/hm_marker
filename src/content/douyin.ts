@@ -1,5 +1,5 @@
 import type { VideoItem, VideoDetail, ChapterInfo, SubtitleSegment, Message, CollectProgress } from "../lib/types";
-import { cleanSubtitle } from "../lib/subtitle";
+import { cleanSubtitle, isSubtitleRelevant } from "../lib/subtitle";
 
 function sleep(ms: number): Promise<void> { return new Promise((r) => setTimeout(r, ms)); }
 function extractTags(text: string): string[] { const m = text.match(/#[^#\s]+/g); return m ? m.map((t) => t.replace(/^#/, "")) : []; }
@@ -227,12 +227,16 @@ async function handleExtractDetail(videoId: string): Promise<{ detail: VideoDeta
   detail.aiSummary = cs.aiSummary;
   detail.chapters = cs.chapters;
  const sub = await collectSubtitle();
-  // 字幕质量过滤
+ // 字幕质量过滤
   if (sub.subtitle) {
     const cleaned = cleanSubtitle(sub.subtitle, sub.subtitleSegments);
     if (cleaned) {
-      detail.subtitle = cleaned.subtitle;
-      detail.subtitleSegments = cleaned.segments;
+      // 关联性检测：确保字幕内容跟视频标题匹配
+      const pageTitle = document.title || "";
+      if (isSubtitleRelevant(pageTitle, detail.tags || [], detail.desc || "", cleaned.subtitle)) {
+        detail.subtitle = cleaned.subtitle;
+        detail.subtitleSegments = cleaned.segments;
+      }
     }
   }
   // 组装 content（可读的内容正文）
