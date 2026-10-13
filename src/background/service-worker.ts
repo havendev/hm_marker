@@ -1,4 +1,4 @@
-import type { Message, VideoItem, VideoDetail, LLMResult, CollectProgress } from "../lib/types";
+import type { Message, VideoItem, VideoDetail, LLMResult, CollectProgress, SubtitleSegment, ChapterInfo } from "../lib/types";
 import { mergeVideos, loadVideos, batchUpdate, getConfig } from "../lib/storage";
 import { processAllVideos } from "../lib/llm-client";
 
@@ -103,6 +103,122 @@ async function collectBilibiliFavorites(onProgress: (status: string) => void): P
 }
 
 // ─── 阶段一：收藏列表采集 ────────────────────────────────────
+
+// ─── B站 阶段二：API 详情+字幕提取（不需要开标签页）────────────
+
+async function enrichBilibiliVideos(videos: VideoItem[]): Promise<VideoItem[]> {
+  if (videos.length === 0) return videos;
+  sendProgress("DETAIL_PROGRESS", 0, videos.length, `B站：开始提取详情 (共 ${videos.length} 个)...`);
+
+  const enriched: VideoItem[] = [];
+  for (let i = 0; i < videos.length; i++) {
+    const video = videos[i];
+    sendProgress("DETAIL_PROGRESS", i, videos.length,
+      `B站：提取第 ${i + 1}/${videos.length} 个... ${video.title.slice(0, 20)}`);
+
+    try {
+      // 1) 视频基本信息
+      const viewResp = await fetch(
+        `https://api.bilibili.com/x/web-interface/view?bvid=${video.id}`,
+        { credentials: "include" },
+      );
+      const viewData = await viewResp.json();
+      const vd = viewData.code === 0 ? viewData.data : null;
+      if (!vd) { enriched.push(video); continue; }
+
+      // 2) 标签
+      let tags: string[] = [];
+      try {
+        const tagResp = await fetch(
+          `https://api.bilibili.com/x/tag/archive/tags?bvid=${video.id}`,
+          { credentials: "include" },
+        );
+        const tagData = await tagResp.json();
+        if (tagData.code === 0 && Array.isArray(tagData.data)) {
+          tags = tagData.data.map((t: Record<string, unknown>) => String(t.tag_name || "")).filter(Boolean);
+        }
+      } catch { /* tags optional */ }
+
+      // 3) 字幕
+      let subtitle: string | undefined;
+      let subtitleSegments: SubtitleSegment[] | undefined;
+      const aid = vd.aid;
+      const cid = vd.cid;
+      if (aid && cid) {
+        try {
+          const playerResp = await fetch(
+            `https://api.bilibili.com/x/player/v2?aid=${aid}&cid=${cid}`,
+            { credentials: "include" },
+          );
+          const playerData = await playerResp.json();
+          const subs = playerData?.data?.subtitle?.subtitles;
+          if (Array.isArray(subs) && subs.length > 0) {
+            const zhSub = subs.find((s: Record<string, unknown>) =>
+              String(s.lan || "").includes("zh")) || subs[0];
+            let subUrl = String(zhSub.subtitle_url || "");
+            if (subUrl.startsWith("//")) subUrl = "https:" + subUrl;
+            const subResp = await fetch(subUrl);
+            const subData = await subResp.json();
+            if (Array.isArray(subData.body)) {
+              subtitleSegments = subData.body.map((item: Record<string, unknown>) => ({
+                start: Math.round(Number(item.from || 0)),
+                end: Math.round(Number(item.to || 0)),
+                text: String(item.content || "").trim(),
+              })).filter((seg: SubtitleSegment) => seg.text.length > 0);
+              subtitle = subtitleSegments.map((s) => s.text).join(" ");
+            }
+          }
+        } catch { /* subtitle optional */ }
+      }
+
+      // 4) 章节解析（从简介时间轴）
+      let chapters: ChapterInfo[] | undefined;
+      const desc = String(vd.desc || "");
+      if (desc) {
+        const lines = desc.split("\n");
+        const timeRe = /(\d{1,2}:\d{2}(?::\d{2})?)\s*(.+)/;
+        const found: ChapterInfo[] = [];
+        for (const line of lines) {
+          const m = line.trim().match(timeRe);
+          if (m && m[2] && m[2].trim().length > 0) found.push({ time: m[1], title: m[2].trim() });
+        }
+        if (found.length > 0) chapters = found;
+      }
+
+      // 5) 组装 content
+      const parts: string[] = [];
+      if (desc) parts.push(desc);
+      if (tags.length > 0) parts.push("标签: " + tags.join(" "));
+      if (chapters) for (const ch of chapters) parts.push(`${ch.time} ${ch.title}`);
+      if (subtitle) parts.push(subtitle);
+
+      const stat = vd.stat || {};
+      enriched.push({
+        ...video,
+        title: String(vd.title || video.title),
+        author: vd.owner?.name || video.author,
+        coverUrl: vd.pic || video.coverUrl,
+        duration: vd.duration || video.duration,
+        likeCount: stat.like,
+        commentCount: stat.reply,
+        collectCount: stat.favorite,
+        shareCount: stat.share,
+        publishTime: vd.pubdate ? new Date(vd.pubdate * 1000).toISOString().slice(0, 10) : video.publishTime,
+        tags,
+        chapters,
+        subtitle,
+        subtitleSegments,
+        content: parts.join("\n\n"),
+      });
+    } catch {
+      enriched.push(video);
+    }
+    await sleep(300 + Math.random() * 200);
+  }
+
+  sendProgress("DETAIL_PROGRESS", videos.length, videos.length, "B站：详情提取完成");
+  return enriched;
+}
 
 async function collectFavoritesList(): Promise<VideoItem[]> {
   sendProgress("COLLECT_PROGRESS", 0, 0, "阶段1：正在打开收藏夹页面...");
@@ -237,7 +353,9 @@ chrome.runtime.onMessage.addListener((msg: Message, _sender, sendResponse) => {
           }
           await mergeVideos(videos);
           sendProgress("COLLECT_PROGRESS", videos.length, videos.length, `阶段1完成：发现 ${videos.length} 个视频`);
-          const enriched = await enrichAllVideos(videos, platform);
+          const enriched = platform === "bilibili"
+            ? await enrichBilibiliVideos(videos)
+            : await enrichAllVideos(videos, platform);
           await mergeVideos(enriched);
           sendProgress("COLLECT_COMPLETE", enriched.length, enriched.length, "采集完成");
           sendResponse({ count: enriched.length, videos: enriched });
