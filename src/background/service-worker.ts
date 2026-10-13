@@ -1,6 +1,7 @@
 import type { Message, VideoItem, VideoDetail, LLMResult, CollectProgress, SubtitleSegment, ChapterInfo } from "../lib/types";
 import { mergeVideos, loadVideos, batchUpdate, getConfig } from "../lib/storage";
 import { processAllVideos } from "../lib/llm-client";
+import { cleanSubtitle } from "../lib/subtitle";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
@@ -165,13 +166,35 @@ async function enrichBilibiliVideos(videos: VideoItem[]): Promise<VideoItem[]> {
                 end: Math.round(Number(item.to || 0)),
                 text: String(item.content || "").trim(),
               })).filter((seg: SubtitleSegment) => seg.text.length > 0);
-              subtitle = subtitleSegments.map((s) => s.text).join(" ");
-            }
-          }
-        } catch { /* subtitle optional */ }
+             subtitle = subtitleSegments.map((s) => s.text).join(" ");
+           }
+         }
+       } catch { /* subtitle optional */ }
+     }
+
+      // 3.5) 字幕质量过滤：剔除纯音乐标记等垃圾内容
+      if (subtitle) {
+        const cleaned = cleanSubtitle(subtitle, subtitleSegments);
+        if (!cleaned) {
+          subtitle = undefined;
+          subtitleSegments = undefined;
+        } else {
+          subtitle = cleaned.subtitle;
+          subtitleSegments = cleaned.segments;
+        }
       }
 
-      // 4) 章节解析（从简介时间轴）
+      // 3.6) 多P视频：用分P列表生成章节
+      const pages = vd.pages;
+      if (Array.isArray(pages) && pages.length > 1) {
+        chapters = pages.map((p: Record<string, unknown>) => ({
+          time: "P" + (p.page || "?"),
+          title: String(p.part || "").slice(0, 80),
+          content: undefined,
+        }));
+      }
+
+     // 4) 章节解析（从简介时间轴）
       let chapters: ChapterInfo[] | undefined;
       const desc = String(vd.desc || "");
       if (desc) {
