@@ -148,6 +148,29 @@ npm run dev
 npm run build
 ```
 
+```bash
+# 打包（构建 + zip）
+npm run package
+```
+
+### 打包分发
+
+```bash
+npm run package
+```
+
+生成 `aimarker-v0.1.0.zip`，用户安装方式有两种：
+
+**方式一：开发者模式加载（无需上架）**
+1. 解压 zip 到任意文件夹
+2. 打开 `chrome://extensions/`，开启「开发者模式」
+3. 点击「加载已解压的扩展程序」，选择解压后的文件夹
+
+**方式二：Chrome Web Store 上架**
+1. 用 `aimarker-v0.1.0.zip` 作为上传包
+2. 在 [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/devconsole) 提交审核
+3. 审核通过后用户可以直接安装
+
 ## 技术栈
 
 - Chrome Extension Manifest V3
