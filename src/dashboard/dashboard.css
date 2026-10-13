@@ -32,6 +32,10 @@ body {
 .search-box input:focus { border-color: #dc2626; }
 
 .category-nav { flex: 1; padding: 0 8px; overflow-y: auto; }
+.source-filter { display: flex; gap: 4px; padding: 0 12px 8px; }
+.source-btn { flex: 1; padding: 5px 0; border: none; background: #f3f4f6; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; color: #6b7280; transition: all 0.15s; }
+.source-btn.active { background: #1f2937; color: #fff; }
+.source-btn:hover:not(.active) { background: #e5e7eb; }
 .cat-item {
   display: flex; align-items: center; justify-content: space-between;
   padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 14px;
@@ -196,6 +200,10 @@ mark {
   margin-left: 8px;
   transition: all 0.15s;
 }
+.card-delete-row { display: flex; align-items: center; margin-top: 8px; }
+.source-badge { display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 999px; }
+.source-badge.douyin { background: #fff0f0; color: #fe2c55; }
+.source-badge.bilibili { background: #e0f2fe; color: #00a1d6; }
 .card-delete:hover {
   background: #ef4444;
   color: #fff;

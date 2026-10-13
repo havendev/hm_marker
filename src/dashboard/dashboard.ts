@@ -3,6 +3,7 @@ import { loadVideos, onVideosChanged, deleteVideo, clearVideos } from "../lib/st
 
 let allVideos: VideoItem[] = [];
 let activeCategory = "all";
+let activeSource = "all";
 let searchQuery = "";
 let sortBy = "category";
 let viewMode = "grid";
@@ -20,10 +21,11 @@ const viewGridBtn = $("view-grid");
 const viewListBtn = $("view-list");
 
 function getCategories(): Map<string, number> {
+  const scoped = activeSource !== "all" ? allVideos.filter((v) => v.source === activeSource) : allVideos;
   const map = new Map<string, number>();
-  map.set("全部", allVideos.length);
-  map.set("未分类", allVideos.filter((v) => !v.processed).length);
-  for (const v of allVideos) {
+  map.set("全部", scoped.length);
+  map.set("未分类", scoped.filter((v) => !v.processed).length);
+  for (const v of scoped) {
     if (v.category) map.set(v.category, (map.get(v.category) || 0) + 1);
   }
   return map;
@@ -50,6 +52,9 @@ function renderSidebar() {
 // 搜索匹配：标题、摘要、标签、字幕
 function getFilteredVideos(): VideoItem[] {
   let filtered = allVideos;
+  if (activeSource !== "all") {
+    filtered = filtered.filter((v) => v.source === activeSource);
+  }
   if (activeCategory === "unprocessed") {
     filtered = filtered.filter((v) => !v.processed);
   } else if (activeCategory !== "all") {
@@ -158,16 +163,20 @@ function renderVideos() {
       v.subtitle ? `<span class="has-subtitle">有字幕</span>` : "",
     ].filter(Boolean).join("");
 
+    const sourceName = v.source === "bilibili" ? "B站" : "抖音";
+    const sourceCls = v.source === "bilibili" ? "bilibili" : "douyin";
+    const sourceBadge = `<span class="source-badge ${sourceCls}">${sourceName}</span>`;
+    const deleteRow = `<div class="card-delete-row"><a class="card-link" href="${v.url}" target="_blank">原视频 →</a><button class="card-delete" data-video-id="${v.id}" title="删除">删除</button></div>`;
+
     return `<div class="video-card ${processed ? "" : "unprocessed"}">${cover}
-      <div class="card-body">${catTag}
+      <div class="card-body">${catTag}${sourceBadge}
         <p class="card-title">${highlightText(v.title.slice(0, 100), searchQuery)}</p>
         ${summary}
         ${contentBlock}
         ${subtitleBlock}
         <div class="card-meta">${metaParts}</div>
         <div class="card-tags">${tags}</div>
-        <a class="card-link" href="${v.url}" target="_blank">原视频 →</a>
-        <button class="card-delete" data-video-id="${v.id}" title="删除">删除</button>
+        ${deleteRow}
       </div>
     </div>`;
   }).join("");
@@ -240,6 +249,16 @@ searchInput.addEventListener("input", () => {
 });
 
 sortSelect.addEventListener("change", () => { sortBy = sortSelect.value; renderVideos(); });
+
+document.querySelectorAll(".source-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".source-btn").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    activeSource = (btn as HTMLElement).dataset.source || "all";
+    renderSidebar();
+    renderVideos();
+  });
+});
 
 viewGridBtn.addEventListener("click", () => {
   viewMode = "grid"; viewGridBtn.classList.add("active"); viewListBtn.classList.remove("active"); renderVideos();
