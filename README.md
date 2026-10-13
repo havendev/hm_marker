@@ -188,6 +188,12 @@ npm run package
 
 [MIT License](./LICENSE)
 
+## 赞赏
+
+如果这个项目对你有帮助，可以请作者喝杯咖啡 ☕
+
+![赞赏码](./docs/donation.jpg)
+
 ## 贡献
 
 欢迎提交 Issue 和 Pull Request。请阅读 [贡献指南](./CONTRIBUTING.md)。
